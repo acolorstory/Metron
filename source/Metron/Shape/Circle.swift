@@ -83,6 +83,95 @@ public extension Circle {
     }
 }
 
+public extension Circle {
+
+    public func intersection(with line: Line) -> [CGPoint] {
+        let minPoint = CGPoint(x: CGFloat.leastNormalMagnitude, y: CGFloat.leastNormalMagnitude)
+        let maxPoint = CGPoint(x: CGFloat.greatestFiniteMagnitude, y: CGFloat.greatestFiniteMagnitude)
+
+        let pointXA = line.point(atX: center.x - radius) ?? maxPoint
+        let pointXB = line.point(atX: center.x + radius) ?? minPoint
+        let pointYA = line.point(atY: center.y - radius) ?? maxPoint
+        let pointYB = line.point(atY: center.y + radius) ?? minPoint
+
+        let distX = pointXA.distance(to: pointXB)
+        let distY = pointYA.distance(to: pointYB)
+
+        let pointA = distX <= distY ? pointXA : pointYA
+        let pointB = distX <= distY ? pointXB : pointYB
+
+        let segment = LineSegment(a: pointA, b: pointB)
+
+        return intersection(with: segment)
+    }
+
+    public func intersection(with lineSegment: LineSegment) -> [CGPoint] {
+        let epsilon = 0.0001 as CGFloat
+        let lineLength = lineSegment.length
+        var normalizedLineVector = CGPoint(x: lineSegment.b.x - lineSegment.a.x,
+                                           y: lineSegment.b.y - lineSegment.a.y)
+        // normalize line vector
+
+        normalizedLineVector.x /= lineLength
+        normalizedLineVector.y /= lineLength
+
+        let circleCenterVector = CGPoint(x: center.x - lineSegment.a.x,
+                                         y: center.y - lineSegment.a.y)
+
+        // dot product between line vector and circle center vector
+        let circleLineDotProduct = circleCenterVector.x * normalizedLineVector.x + circleCenterVector.y * normalizedLineVector.y
+
+        // project circle center onto line. This gives the closest point from the circle to the line
+        var circleToLineProjection = normalizedLineVector
+        circleToLineProjection.x *= circleLineDotProduct
+        circleToLineProjection.y *= circleLineDotProduct
+
+        // convert to "world" coordinates
+        circleToLineProjection.x += lineSegment.a.x
+        circleToLineProjection.y += lineSegment.a.y
+
+        // circle and line intersect if the circle contains the projected point
+        let distanceToCircle = circleToLineProjection.distance(to: center)
+        if abs(distanceToCircle-radius) < epsilon { //ulpOfOne = epsilon
+            if circleLineDotProduct >= 0 && circleLineDotProduct <= lineLength {
+                return [circleToLineProjection]
+            } else {
+                return []
+            }
+        } else if distanceToCircle < radius {
+            // two points
+            let dt = sqrt(radius * radius - distanceToCircle * distanceToCircle)
+            let t1 = circleLineDotProduct - dt
+            let t2 = circleLineDotProduct + dt
+            let inter1 = t1 >= 0 && (t1 < lineLength || (abs(t1-lineLength) < epsilon))
+            let inter2 = t2 >= 0 && (t2 < lineLength || (abs(t2-lineLength) < epsilon))
+
+            var i1: CGPoint = .zero
+            var i2: CGPoint = .zero
+            if inter1 {
+                i1 = CGPoint(x: normalizedLineVector.x * t1 + lineSegment.a.x,
+                             y: normalizedLineVector.y * t1 + lineSegment.a.y)
+            }
+            if inter2 {
+                i2 = CGPoint(x: normalizedLineVector.x * t2 + lineSegment.a.x,
+                             y: normalizedLineVector.y * t2 + lineSegment.a.y)
+            }
+            if(inter1 && inter2) {
+                return [i1, i2]
+            } else if(inter1) {
+                return [i1]
+            } else if(inter2) {
+                return [i2];
+            } else {
+                return [];
+            }
+        } else {
+            // no points
+            return []
+        }
+    }
+}
+
 // MARK: Drawable
 
 extension Circle: Drawable {
